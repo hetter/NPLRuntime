@@ -39,12 +39,13 @@ extern "C" {
 
 #include <luabind/luabind.hpp>
 #include <luabind/object.hpp>
+#include "os_calls.h"
 #include "ParaScriptingIO.h"
 
 using namespace luabind;
 
 //@def the maximum number of bytes in a text file line.
-#define MAX_LINE_CHARACTER_NUM	500
+#define MAX_LINE_CHARACTER_NUM	512
 
 namespace ParaScripting
 {
@@ -381,23 +382,49 @@ namespace ParaScripting
 
 	void ParaIO::WriteString(const char* str)
 	{
-		g_currentIOfile.WriteString(str);
+		if (!g_currentIOfile.isEof())
+			g_currentIOfile.WriteString(str);
+		else
+		{
+			// write to stdout
+			fputs(str, stdout);
+			fflush(stdout);
+		}
 	}
 
 	void ParaIO::write(const char* buffer, int nSize)
 	{
-		g_currentIOfile.write(buffer, nSize);
+		if (!g_currentIOfile.isEof())
+			g_currentIOfile.write(buffer, nSize);
+		else
+		{
+			WriteString(buffer);
+		}
 	}
 
 	const char* ParaIO::readline()
 	{
 		// not thread safe
 		static char line[MAX_LINE_CHARACTER_NUM];
-		if(g_currentIOfile.isEof())
-			return NULL;
+		if (g_currentIOfile.isEof())
+		{
+			// read from stdio
+			return readline2("");
+		}
 		else
 			g_currentIOfile.GetNextLine(line, MAX_LINE_CHARACTER_NUM-1);
 		return line;
+	}
+
+	const char* ParaIO::readline2(const char* prompt)
+	{
+		// read from stdio
+		static std::string sLine;
+		if (ParaEngine::ReadLine(sLine, prompt))
+		{
+			return sLine.c_str();
+		}
+		return NULL;
 	}
 
 	bool ParaIO::DoesFileExist(const char * filename, bool bSearchZipFiles)
@@ -993,7 +1020,7 @@ namespace ParaScripting
 
 	void ParaFileObject::writeline(const char* str)
 	{
-		if(IsValid())
+		if (IsValid())
 		{
 			m_pFile->WriteString(str);
 			m_pFile->WriteString("\n");
