@@ -113,7 +113,7 @@ void ParaEngine::CBlockWorld::EnterWorld(const string& sWorldDir, float x, float
 
 	//init data
 #if defined(PARAENGINE_MOBILE)
-	m_maxCacheRegionCount = 4;
+	m_maxCacheRegionCount = 16;
 #else
 	// m_maxCacheRegionCount = 16;
 	// only use more region cache on 64 bits system.
