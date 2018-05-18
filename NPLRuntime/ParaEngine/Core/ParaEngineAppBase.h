@@ -56,6 +56,8 @@ namespace ParaEngine
 		virtual bool GetAutoLowerFrameRateWhenNotFocused() override;
 		virtual void SetToggleSoundWhenNotFocused(bool bEnabled) override;
 		virtual bool GetToggleSoundWhenNotFocused() override;
+
+		virtual void onCmdLine(const std::string& cmd);
 		
 		/** return true if this is a render tick, otherwise false.
 		* @param pNextInterval: main_loop timer interval.
@@ -91,6 +93,9 @@ namespace ParaEngine
 
 
 		virtual void DeleteInterface() override  { delete this; }
+        
+        void setRenderEnabled(bool b) { m_bRender = b; }
+        bool getRenderEnabled () const {return m_bRender;};
 
 	protected:
 		static IParaEngineApp* g_pCurrentApp;
@@ -127,6 +132,7 @@ namespace ParaEngine
 		double            m_fElapsedTime;      // Time elapsed since last frame
 		float m_fFPS;
 		bool m_bActive;
+        bool m_bRender;
 		bool m_bAudioEngineInitialized;
 
 #pragma region OLD_CODE
@@ -406,6 +412,9 @@ namespace ParaEngine
 		/** obsoleted function: */
 		PE_DEPRECATED_ATTRIBUTE virtual int32 GetTouchPointX() override { return 0;  };
 		PE_DEPRECATED_ATTRIBUTE virtual int32 GetTouchPointY() override { return 0; };
+
+		/** get the attribute object of the main ParaEngine interface */
+		virtual IAttributeFields* GetAttributeObject() override;
 
 
 	public:

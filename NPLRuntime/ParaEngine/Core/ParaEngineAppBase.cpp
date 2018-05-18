@@ -96,6 +96,7 @@ ParaEngine::CParaEngineAppBase::CParaEngineAppBase()
 	, m_pRenderDevice(nullptr)
 	, m_doWorkFRC(CFrameRateController::FRC_CONSTANT_OR_BELOW)
 	, m_bActive(true), m_fFPS(0.f), m_fTime(0.f), m_fElapsedTime(0.f), m_fRefreshTimerInterval(-1.f), m_nFrameRateControl(0)
+    , m_bRender(true)
 {
 	g_pCurrentApp = this;
 	// we use high resolution timer (boost ASIO internally), hence FPS can be specified very accurately without eating all CPUs. 
@@ -116,6 +117,7 @@ ParaEngine::CParaEngineAppBase::CParaEngineAppBase(const char* sCmd)
 	, m_pRenderDevice(nullptr)
 	, m_doWorkFRC(CFrameRateController::FRC_CONSTANT_OR_BELOW)
 	, m_bActive(true), m_fFPS(0.f), m_fTime(0.f), m_fElapsedTime(0.f), m_fRefreshTimerInterval(-1.f), m_nFrameRateControl(0)
+    , m_bRender(true)
 {
 	g_pCurrentApp = this;
 	// we use high resolution timer (boost ASIO internally), hence FPS can be specified very accurately without eating all CPUs. 
@@ -632,11 +634,13 @@ void ParaEngine::CParaEngineAppBase::OnPause()
 {
 	//InvalidateDeviceObjects();
 	ActivateApp(false);
+    setRenderEnabled(false);
 }
 
 void ParaEngine::CParaEngineAppBase::OnResume()
 {
 	ActivateApp(true);
+    setRenderEnabled(true);
 }
 
 void ParaEngine::CParaEngineAppBase::OnRendererRecreated(IRenderWindow * renderWindow)
@@ -736,6 +740,12 @@ void ParaEngine::CParaEngineAppBase::DestroySingletons()
 void ParaEngine::CParaEngineAppBase::OnFrameEnded()
 {
 	CObjectAutoReleasePool::GetInstance()->clear();
+}
+
+
+ParaEngine::IAttributeFields* ParaEngine::CParaEngineAppBase::GetAttributeObject()
+{
+	return &ParaEngineSettings::GetSingleton();
 }
 
 bool ParaEngine::CParaEngineAppBase::InitCommandLineParams()
@@ -854,8 +864,12 @@ HRESULT ParaEngine::CParaEngineAppBase::DoWork()
 	if (m_doWorkFRC.FrameMove(m_fTime) > 0)
 	{
 		FrameMove(m_fTime);
-		Render();
-		m_pRenderDevice->Present();
+        if (getRenderEnabled())
+        {
+            Render();
+            m_pRenderDevice->Present();
+        }
+		
 		return S_OK;
 	}
 	else
@@ -933,6 +947,21 @@ void ParaEngine::CParaEngineAppBase::SetToggleSoundWhenNotFocused(bool bEnabled)
 bool ParaEngine::CParaEngineAppBase::GetToggleSoundWhenNotFocused()
 {
 	return false;
+}
+
+void ParaEngine::CParaEngineAppBase::onCmdLine(const std::string& cmd)
+{
+	OUTPUT_LOG("onCmdLine: %s", cmd.c_str());
+
+	if (!cmd.empty())
+	{
+		// msg = command line.
+		string msg = "msg=";
+		NPL::NPLHelper::EncodeStringInQuotation(msg, (int)msg.size(), cmd.c_str());
+		msg.append(";");
+		SystemEvent event(SystemEvent::SYS_COMMANDLINE, msg);
+		CGlobals::GetEventsCenter()->FireEvent(event);
+	}
 }
 
 void ParaEngine::CParaEngineAppBase::SetRefreshTimer(float fTimeInterval, int nFrameRateControl /*= 0*/)
