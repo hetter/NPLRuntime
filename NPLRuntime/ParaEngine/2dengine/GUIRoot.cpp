@@ -1823,7 +1823,7 @@ void ParaEngine::CGUIRoot::SetMinimumScreenSize(int nWidth, int nHeight, bool bA
 
 		float fScaleX = fWidth / m_fMinScreenWidth;
 		float fScaleY = fHeight / m_fMinScreenHeight;
-		if (fScaleX < 1.f || fScaleY < 1.f)
+		//if (fScaleX < 1.f || fScaleY < 1.f)
 		{
 			// take the larger one
 			if (fScaleX < fScaleY)
@@ -1832,9 +1832,9 @@ void ParaEngine::CGUIRoot::SetMinimumScreenSize(int nWidth, int nHeight, bool bA
 				fScaleX = fScaleY;
 			SetUIScale(fScaleX, fScaleY, false);
 		}
-		else
+		//else
 		{
-			SetUIScale(-1.f, -1.f, false);
+		//	SetUIScale(-1.f, -1.f, false);
 		}
 	}
 }
