@@ -302,7 +302,12 @@ HRESULT ParaEngine::CParaXProcessor::CopyToResource()
 				if (sExt == "bmax")
 				{
 					// block max model. 
-					BMaxParser p(myFile.getBuffer(), myFile.getSize());
+					BMaxParser p;
+					ParaXEntity* pParaEntity = dynamic_cast<ParaXEntity*>(m_asset.get());
+					if (pParaEntity != nullptr) {
+						p.SetMergeCoplanerBlockFace(pParaEntity->GetMergeCoplanerBlockFace());
+					}
+					p.Load(myFile.getBuffer(), myFile.getSize());
 					iCur->m_pParaXMesh = p.ParseParaXModel();
 					auto pParaXMesh = iCur->m_pParaXMesh;
 
@@ -354,12 +359,8 @@ HRESULT ParaEngine::CParaXProcessor::CopyToResource()
 				else
 				{
 					CParaXSerializer serializer;
-#if  defined(USE_DIRECTX_RENDERER) && !defined(_DEBUG)
-					ParaXParser parser(myFile, CAsyncLoader::GetSingleton().GetFileParser());
-					iCur->m_pParaXMesh = (CParaXModel*)serializer.LoadParaXMesh(myFile, parser);
-#else
+					serializer.SetFilename(iCur->m_sMeshFileName);
 					iCur->m_pParaXMesh = (CParaXModel*)serializer.LoadParaXMesh(myFile);
-#endif
 				}
 				if (iCur->m_pParaXMesh == 0)
 				{

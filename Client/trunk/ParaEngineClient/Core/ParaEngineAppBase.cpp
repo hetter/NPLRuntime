@@ -38,6 +38,7 @@
 #include "NPLPackageConfig.h"
 #include "IO/ResourceEmbedded.h"
 #include "GeosetObject.h"
+#include "AutoRigger.h"
 
 using namespace ParaEngine;
 
@@ -206,12 +207,18 @@ void ParaEngine::CParaEngineAppBase::RegisterObjectClasses()
 	pAttManager->RegisterObjectFactory("COverlayObject", new CDefaultObjectFactory<COverlayObject>());
 	pAttManager->RegisterObjectFactory("CLightObject", new CDefaultObjectFactory<CLightObject>());
 	pAttManager->RegisterObjectFactory("CGeosetObject",new CDefaultObjectFactory<CGeosetObject>());
+	pAttManager->RegisterObjectFactory("CAutoRigger", new CDefaultObjectFactory<CAutoRigger>());
 	// TODO add more here: 
 }
 
 bool ParaEngine::CParaEngineAppBase::Is3DRenderingEnabled()
 {
 	return m_bEnable3DRendering;
+}
+
+ParaEngine::IAttributeFields* ParaEngine::CParaEngineAppBase::GetAttributeObject()
+{
+	return &ParaEngineSettings::GetSingleton();
 }
 
 void ParaEngine::CParaEngineAppBase::Enable3DRendering(bool val)

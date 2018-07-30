@@ -34,14 +34,21 @@ namespace ParaEngine
 	const int BMaxParser::MaxBoneLengthHorizontal = 50;
 	const int BMaxParser::MaxBoneLengthVertical = 100;
 
-	BMaxParser::BMaxParser(const char* pBuffer, int32 nSize, const char* filename, BMaxParser* pParent)
-		: m_bAutoScale(true), m_nHelperBlockId(90), m_pAnimGenerator(NULL), m_pParent(pParent),
-		m_bHasAnimation(false), m_centerPos(0, 0, 0), m_fScale(1.f), m_nLodLevel(0)
+	BMaxParser::BMaxParser(const char* filename, BMaxParser* pParent)
+		: m_bAutoScale(true)
+		, m_nHelperBlockId(90)
+		, m_pAnimGenerator(NULL)
+		, m_pParent(pParent)
+		, m_bHasAnimation(false)
+		, m_centerPos(0, 0, 0)
+		, m_fScale(1.f)
+		, m_nLodLevel(0)
+		, m_bMergeCoplanerBlockFace(true)
 	{
 		m_bHasBoneBlock = false;
 		if (filename)
 			SetFilename(filename);
-		Load(pBuffer, nSize);
+		//Load(pBuffer, nSize);
 	}
 
 	BMaxParser::~BMaxParser(void)
@@ -90,7 +97,11 @@ namespace ParaEngine
 				ParseBlocks_Internal(value);
 				ParseBlockFrames();
 				CalculateBoneWeights();
-				MergeCoplanerBlockFace();
+				if (m_bMergeCoplanerBlockFace) {
+					MergeCoplanerBlockFace();
+				}else {
+					CreatRectanglesFromBlocks();
+				}
 			}
 		}
 	}
@@ -432,6 +443,36 @@ namespace ParaEngine
 			rectangle->ScaleVertices(fScale);
 		}
 		// OUTPUT_LOG("rect count %d \n", m_rectangles.size());
+	}
+
+	void BMaxParser::CreatRectanglesFromBlocks()
+	{
+		ParseVisibleBlocks();
+
+		m_rectangles.clear();
+		for (auto& item : m_nodes)
+		{
+			BMaxNode *node = item.second.get();
+			if (node->GetBlockModel())
+			{
+				for (int i = 0; i < 6; i++)
+				{
+					RectanglePtr rectangle(new Rectangle(node, i));
+					rectangle->CloneNodes();
+					m_rectangles.push_back(rectangle);
+				}
+			}
+		}
+
+		float fScale = m_fScale;
+		if (m_nLodLevel > 0) {
+			fScale *= (float)pow(2, m_nLodLevel);
+		}
+
+		for (RectanglePtr& rectangle : m_rectangles)
+		{
+			rectangle->ScaleVertices(fScale);
+		}
 	}
 
 
@@ -861,6 +902,7 @@ namespace ParaEngine
 		int total_count = 0;
 		int nStartVertex = 0;
 
+		int nRootBoneIndex = 0;
 		for (uint32 i = 0; i < m_rectangles.size(); i++)
 		{
 			Rectangle *rectangle = m_rectangles[i].get();
@@ -895,7 +937,9 @@ namespace ParaEngine
 		
 				modelVertex.color0 = pVertices->color2;
 				//set bone and weight, only a single bone
-				modelVertex.bones[0] = rectangle->GetBoneIndexAt(k);
+				int nBoneIndex = rectangle->GetBoneIndexAt(k);
+				// if no bone is found, use the default root bone
+				modelVertex.bones[0] = (nBoneIndex != -1) ? nBoneIndex : nRootBoneIndex;
 				modelVertex.weights[0] = vertex_weight;
 
 				m_vertices.push_back(modelVertex);
@@ -913,7 +957,6 @@ namespace ParaEngine
 			nStartVertex += nVertices;
 		}
 
-		int nRootBoneIndex = 0;
 		for (uint32 i = 0; i < m_blockModels.size(); i++)
 		{
 			BlockModel* model = m_blockModels.at(i);
@@ -1032,10 +1075,13 @@ namespace ParaEngine
 			}
 		}
 
-		if (m_anims.size() > 0 && m_bones.size() > 0)
+		if (m_bones.size() > 0)
 		{
-			pMesh->anims = new ModelAnimation[m_anims.size()];
-			memcpy(pMesh->anims, &(m_anims[0]), sizeof(ModelAnimation)*m_anims.size());
+			if (m_anims.size() > 0)
+			{
+				pMesh->anims = new ModelAnimation[m_anims.size()];
+				memcpy(pMesh->anims, &(m_anims[0]), sizeof(ModelAnimation)*m_anims.size());
+			}
 			pMesh->animBones = true;
 			pMesh->animated = true;
 		}
@@ -1341,6 +1387,7 @@ namespace ParaEngine
 
 	void BMaxParser::CalculateBoneWeightForBlock(BMaxFrameNode* pBoneNode, BMaxNode* node, bool bMustBeSameColor)
 	{
+#if 0
 		if (node && !node->HasBoneWeight())
 		{
 			if (node->template_id != BoneBlockId)
@@ -1355,6 +1402,32 @@ namespace ParaEngine
 				}
 			}
 		}
+#else
+		std::stack<BMaxNode*> nodeStack;
+		if (node)
+			nodeStack.push(node);
+
+		while (!nodeStack.empty())
+		{
+			auto cur = nodeStack.top();
+			nodeStack.pop();
+
+			if (!cur->HasBoneWeight()
+				&& cur->template_id != BoneBlockId
+				&& (!bMustBeSameColor || cur->GetColor() == pBoneNode->GetColor()))
+			{
+				cur->SetBoneIndex(pBoneNode->GetBoneIndex());
+				for (int i = 0; i < 6; i++)
+				{
+					auto neighbour = cur->GetNeighbour((BlockDirection::Side)i);
+					if (neighbour)
+						nodeStack.push(neighbour);
+				}
+
+			}
+
+		}
+#endif
 	}
 
 	void BMaxParser::CalculateBoneSkin(BMaxFrameNode* pBoneNode)
@@ -1552,7 +1625,8 @@ namespace ParaEngine
 			CParaFile file;
 			if (file.OpenFile(sFullFilename.c_str()))
 			{
-				BMaxParser parser(file.getBuffer(), file.getSize(), sFilename.c_str(), this);
+				BMaxParser parser(sFilename.c_str(), this);
+				parser.Load(file.getBuffer(), file.getSize());
 				pModel.reset(parser.ParseParaXModel());
 			}
 			else
@@ -1564,6 +1638,11 @@ namespace ParaEngine
 			return pModel.get();
 		}
 		return NULL;
+	}
+
+	void BMaxParser::SetMergeCoplanerBlockFace(bool val)
+	{
+		m_bMergeCoplanerBlockFace = val;
 	}
 
 
